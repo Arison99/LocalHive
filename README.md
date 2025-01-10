@@ -4,7 +4,6 @@
 ![Build](https://img.shields.io/github/actions/workflow/status/Arison99/LocalHive/build.yml)
 ![Version](https://img.shields.io/github/v/release/Arison99/LocalHive)
 ![Commits](https://img.shields.io/github/commit-activity/m/Arison99/LocalHive)
-![Branches](https://img.shields.io/github/branches/Arison99/LocalHive)
 ![Languages](https://img.shields.io/github/languages/count/Arison99/LocalHive)
 ![Tools](https://img.shields.io/badge/tools-C++%20%7C%20MongoDB%20%7C%20SQLite%20%7C%20Redis-blue)
 ![Issues](https://img.shields.io/github/issues/Arison99/LocalHive)
