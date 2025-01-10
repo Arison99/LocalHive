@@ -11,6 +11,8 @@
 
 ## Overview
 
+<img src="./LocalHive.webp">
+
 **LocalHive** is a powerful development tool designed to streamline local application development. It provides a fully functional local S3 bucket and versatile database connectors, empowering developers to manage and analyze their data with ease. Written in C++, LocalHive is robust, efficient, and future-focused, enabling seamless integration with your projects.
 
 ## Features

@@ -1,9 +1,33 @@
-version: '1.0.0'
+name: Build
 
-stages:
-  - build
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
-build:
-  stage: build
-  script:
-    - echo "Building version 1.0.0"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up C++ environment
+      uses: actions/setup-cpp@v1
+      with:
+        compiler: gcc
+
+    - name: Install dependencies
+      run: sudo apt-get install -y cmake make
+
+    - name: Build project
+      run: |
+        cmake .
+        make
+
+    - name: Run tests
+      run: ./LocalHiveTests
