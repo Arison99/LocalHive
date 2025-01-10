@@ -1,14 +1,14 @@
 # LocalHive
 
-![License](https://img.shields.io/github/license/username/localhive)
-![Build](https://img.shields.io/github/actions/workflow/status/username/localhive/build.yml)
-![Version](https://img.shields.io/github/v/release/username/localhive)
-![Commits](https://img.shields.io/github/commit-activity/m/username/localhive)
-![Branches](https://img.shields.io/github/branches/username/localhive)
-![Languages](https://img.shields.io/github/languages/count/username/localhive)
+![License](https://img.shields.io/github/license/Arison99/LocalHive)
+![Build](https://img.shields.io/github/actions/workflow/status/Arison99/LocalHive/build.yml)
+![Version](https://img.shields.io/github/v/release/Arison99/LocalHive)
+![Commits](https://img.shields.io/github/commit-activity/m/Arison99/LocalHive)
+![Branches](https://img.shields.io/github/branches/Arison99/LocalHive)
+![Languages](https://img.shields.io/github/languages/count/Arison99/LocalHive)
 ![Tools](https://img.shields.io/badge/tools-C++%20%7C%20MongoDB%20%7C%20SQLite%20%7C%20Redis-blue)
-![Issues](https://img.shields.io/github/issues/username/localhive)
-![PRs](https://img.shields.io/github/issues-pr/username/localhive)
+![Issues](https://img.shields.io/github/issues/Arison99/LocalHive)
+![PRs](https://img.shields.io/github/issues-pr/Arison99/LocalHive)
 
 ## Overview
 
@@ -41,11 +41,11 @@
 ### Steps
 1. Clone the repository:
    ```bash
-   git clone https://github.com/username/localhive.git
+   git clone https://github.com/Arison99/LocalHive.git
    ```
 2. Navigate to the project directory:
    ```bash
-   cd localhive
+   cd LocalHive
    ```
 3. Build the project:
    ```bash
@@ -54,7 +54,7 @@
    ```
 4. Run the application:
    ```bash
-   ./localhive
+   ./LocalHive
    ```
 
 ## Usage
@@ -74,7 +74,7 @@
 ## Example
 Here’s a quick example to connect to MongoDB and create a table:
 ```cpp
-#include "localhive.h"
+#include "LocalHive.h"
 
 int main() {
     LocalHive hive;
@@ -101,7 +101,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Contact
 - **Author**: [Your Name](mailto:your.email@example.com)
-- **GitHub**: [username](https://github.com/username/localhive)
+- **GitHub**: [Arison99](https://github.com/Arison99/LocalHive)
 
 ---
 

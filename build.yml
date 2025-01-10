@@ -1,0 +1,9 @@
+version: '1.0.0'
+
+stages:
+  - build
+
+build:
+  stage: build
+  script:
+    - echo "Building version 1.0.0"
