@@ -2,7 +2,7 @@
 
 #           S3-Bucket File Structure.
 
-/s3-bucket-replica/         # Root directory for your S3 Bucket replica
+/s3-Bucket/         # Root directory for your S3 Bucket replica
 │
 ├── /buckets/               # Directory containing all buckets
 │   ├── /bucket1/           # Individual bucket directory
@@ -21,7 +21,7 @@
 │       └── config.json
 │
 ├── logs/                   # Logs directory for system events
-│   └── s3-replica.log      # Log file for debugging and audit trails
+│   └── s3-bucket.log      # Log file for debugging and audit trails
 │
 ├── server/                 # Server-side files for handling networking
 │   ├── server.cpp          # Main server logic (REST API)
