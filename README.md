@@ -1,0 +1,2 @@
+# LocalHive
+ AquaLink is a seamless local development tool designed to bridge your database and a local S3 bucket. Inspired by the concept of water flowing effortlessly, AquaLink ensures smooth data synchronization and management, allowing developers to test and iterate in a controlled environment. With its intuitive interface and efficient data-handling capabilities, AquaLink simplifies the connection between structured database storage and object-based S3 storage, making it an ideal choice for streamlined local development workflows.
