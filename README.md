@@ -1,7 +1,8 @@
 # LocalHive
 
 ![License](https://img.shields.io/github/license/Arison99/LocalHive)
-![Build](https://img.shields.io/github/actions/workflow/status/Arison99/LocalHive/build.yml)
+![Build](https://img.shields.io/github/actions/workflow/status/Arison99/LocalHive/blob/main/.github%2Fworkflows%2Fcmake-multi-platform.yml)
+
 ![Version](https://img.shields.io/github/v/release/Arison99/LocalHive)
 ![Commits](https://img.shields.io/github/commit-activity/m/Arison99/LocalHive)
 ![Languages](https://img.shields.io/github/languages/count/Arison99/LocalHive)
