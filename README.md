@@ -26,6 +26,7 @@
   - Cassandra
   - MariaDB
 - **Data Operations**:
+  - Store images and Videos in Buckets
   - Search, create, and edit database tables.
   - Visualize database processes through interactive graphical analytics.
 - **Future Plans**: UI-based frontend-backend integration without requiring manual Models, Views, and Controllers.
@@ -91,6 +92,16 @@ We welcome contributions! Please:
 3. Submit a pull request.
 
 ## Roadmap
+- Design an S3 Bucket
+- Allow creation of newBuckets
+- Add & implement User Authentication with Administration Rights
+- Create & add DB_Connectors for different Databases
+- Design Backend APIs for the S3 Bucket & DB_Connectors
+- Design UIs ( frontends )
+- Handle Data_Requests from the frontend (Webpages or Desktop App)
+- Build components for data display 
+- Fetch and handle backend processes for analysis
+- Build APIs for Data_Analytics
 - Enhance graphical analytics with real-time monitoring.
 - Introduce frontend-backend integration via a no-code UI.
 - Support additional databases.
@@ -100,9 +111,10 @@ We welcome contributions! Please:
 This project is licensed under the [MIT License](LICENSE).
 
 ## Contact
-- **Author**: [Your Name](mailto:your.email@example.com)
+- **Author**: [Arison99](mailto:harrisondaviinci@gmail.com)
 - **GitHub**: [Arison99](https://github.com/Arison99/LocalHive)
 
 ---
+This documentation is still under progress, so that implies more information about this product will be added during the development process 
 
 Let LocalHive simplify your development process and make local development as seamless as possible!
