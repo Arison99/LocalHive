@@ -1,0 +1,33 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up C++ environment
+      uses: actions/setup-cpp@v1
+      with:
+        compiler: gcc
+
+    - name: Install dependencies
+      run: sudo apt-get install -y cmake make
+
+    - name: Build project
+      run: |
+        cmake .
+        make
+
+    - name: Run tests
+      run: ./LocalHiveTests
