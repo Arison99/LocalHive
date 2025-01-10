@@ -1,0 +1,22 @@
+// ===========================
+// File: /CMakeLists.txt
+// ===========================
+cmake_minimum_required(VERSION 3.10)
+project(s3_bucket)
+
+set(CMAKE_CXX_STANDARD 17)
+
+# Add source files
+add_executable(s3_bucket
+    lib/bucket_manager.cpp
+    lib/file_operations.cpp
+    lib/metadata_manager.cpp
+    server/server.cpp
+    routes/upload.cpp
+    routes/download.cpp
+    routes/delete.cpp
+)
+
+# Link necessary libraries
+find_package(Boost REQUIRED COMPONENTS system)
+target_link_libraries(s3_bucket_replica Boost::system sqlite3)
