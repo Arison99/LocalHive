@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "intelliSenseMode": "windows-gcc-x86",
+            "cStandard": "c23",
+            "cppStandard": "c++23",
+            "compilerPath": "C:\\Program Files (x86)\\Intel\\oneAPI"
+        }
+    ],
+    "version": 4
+}
