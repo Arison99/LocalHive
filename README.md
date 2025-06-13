@@ -11,6 +11,7 @@
 ![PRs](https://img.shields.io/github/issues-pr/Arison99/LocalHive)
 
 ## Overview
+<!-- GitAds-Verify: 5KRHCPVETXL6RMR2RW33G9FXPVY1IRXK -->
 
 <img src="./LocalHive.webp">
 
