@@ -117,6 +117,11 @@ This project is licensed under the [MIT License](LICENSE).
 - **Author**: [Arison99](mailto:harrisondaviinci@gmail.com)
 - **GitHub**: [Arison99](https://github.com/Arison99/LocalHive)
 
+  
+[![Sponsored by GitAds](https://gitads.dev/v1/ad-serve?source=arison99/localhive@github)](https://gitads.dev/v1/ad-track?source=arison99/localhive@github)
+
+
+
 ---
 This documentation is still under progress, so that implies more information about this product will be added during the development process 
 
