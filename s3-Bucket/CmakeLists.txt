@@ -1,10 +1,11 @@
-// ===========================
-// File: /CMakeLists.txt
-// ===========================
 cmake_minimum_required(VERSION 3.10)
 project(s3_bucket)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Include directories
+include_directories(include)
 
 # Add source files
 add_executable(s3_bucket
@@ -12,11 +13,37 @@ add_executable(s3_bucket
     lib/file_operations.cpp
     lib/metadata_manager.cpp
     server/server.cpp
-    routes/upload.cpp
-    routes/download.cpp
-    routes/delete.cpp
+    server/routes/upload.cpp
+    server/routes/download.cpp
+    server/routes/delete.cpp
 )
 
-# Link necessary libraries
+# Find required packages
 find_package(Boost REQUIRED COMPONENTS system)
-target_link_libraries(s3_bucket_replica Boost::system sqlite3)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SQLITE3 REQUIRED sqlite3)
+
+# Link libraries
+target_link_libraries(s3_bucket 
+    Boost::system 
+    ${SQLITE3_LIBRARIES}
+    pthread
+)
+
+# Set compile flags
+target_compile_options(s3_bucket PRIVATE ${SQLITE3_CFLAGS_OTHER})
+target_include_directories(s3_bucket PRIVATE ${SQLITE3_INCLUDE_DIRS})
+
+# Add test executable
+add_executable(s3_bucket_tests
+    tests/bucket_test.cpp
+    tests/file_test.cpp
+    tests/metadata_test.cpp
+    lib/bucket_manager.cpp
+    lib/file_operations.cpp
+    lib/metadata_manager.cpp
+)
+
+target_link_libraries(s3_bucket_tests 
+    ${SQLITE3_LIBRARIES}
+)
