@@ -50,6 +50,7 @@ public:
     ~ComponentRegistry();
 
     void register_component(std::string name, std::shared_ptr<IService> component);
+    Status start_all();
     Status shutdown_all(std::chrono::milliseconds per_component_timeout);
 
     [[nodiscard]] size_t size() const;
@@ -58,9 +59,34 @@ private:
     struct Entry {
         std::string name;
         std::shared_ptr<IService> component;
+        bool started{false};
     };
     std::vector<Entry> components_;
     mutable std::mutex mutex_;
+};
+
+// Coordinates ordered startup and reverse-order shutdown for a service graph.
+// Instances are single-use: after shutdown, construct a new runner to restart.
+class ServiceRunner {
+public:
+    explicit ServiceRunner(ComponentRegistry& components,
+                           std::chrono::milliseconds drain_timeout =
+                               std::chrono::milliseconds(30000))
+        : components_(components), drain_timeout_(drain_timeout) {}
+
+    Status start();
+    Status request_stop();
+    [[nodiscard]] bool is_running() const noexcept {
+        return running_.load(std::memory_order_acquire);
+    }
+
+private:
+    ComponentRegistry& components_;
+    std::chrono::milliseconds drain_timeout_;
+    std::atomic_bool running_{false};
+    std::atomic_bool stopped_{false};
+    std::mutex mutex_;
+    Status stop_status_{Status::Ok()};
 };
 
 class SignalHandler {

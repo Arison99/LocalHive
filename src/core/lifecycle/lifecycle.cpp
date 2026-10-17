@@ -19,12 +19,10 @@ void CancellationToken::cancel() noexcept {
     std::vector<std::function<void()>> cbs;
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        cbs = callbacks_;
+        cbs.swap(callbacks_);
     }
     for (const auto& cb : cbs) {
-        if (cb) {
-            cb();
-        }
+        try { if (cb) cb(); } catch (...) { /* Cancellation must reach all callbacks. */ }
     }
 }
 
@@ -40,7 +38,7 @@ void CancellationToken::register_callback(std::function<void()> cb) {
         }
     }
     if (already_cancelled) {
-        cb();
+        try { cb(); } catch (...) { /* Callback failures do not escape the boundary. */ }
     }
 }
 
@@ -51,7 +49,32 @@ ComponentRegistry::~ComponentRegistry() {
 void ComponentRegistry::register_component(std::string name, std::shared_ptr<IService> component) {
     if (!component) return;
     std::lock_guard<std::mutex> lock(mutex_);
-    components_.push_back({std::move(name), std::move(component)});
+    components_.push_back({std::move(name), std::move(component), false});
+}
+
+Status ComponentRegistry::start_all() {
+    std::vector<Entry> entries;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        entries = components_;
+    }
+    for (size_t i = 0; i < entries.size(); ++i) {
+        Status result;
+        try {
+            result = entries[i].component->start();
+        } catch (...) {
+            result = Status::Error(StatusCode::Internal,
+                                   "Service threw an exception during startup",
+                                   entries[i].name);
+        }
+        if (!result.ok()) {
+            shutdown_all(std::chrono::milliseconds(5000));
+            return result;
+        }
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (i < components_.size()) components_[i].started = true;
+    }
+    return Status::Ok();
 }
 
 Status ComponentRegistry::shutdown_all(std::chrono::milliseconds per_component_timeout) {
@@ -65,15 +88,50 @@ Status ComponentRegistry::shutdown_all(std::chrono::milliseconds per_component_t
     // Stop in REVERSE order
     Status overall = Status::Ok();
     for (auto it = to_stop.rbegin(); it != to_stop.rend(); ++it) {
-        if (it->component) {
-            it->component->request_stop();
-            auto st = it->component->wait_for_stop(per_component_timeout);
+        if (it->component && it->started) {
+            Status st = Status::Ok();
+            try {
+                it->component->request_stop();
+                st = it->component->wait_for_stop(per_component_timeout);
+            } catch (...) {
+                st = Status::Error(StatusCode::Internal,
+                                   "Service threw an exception during shutdown",
+                                   it->name);
+            }
             if (!st.ok() && overall.ok()) {
                 overall = st;
             }
         }
     }
     return overall;
+}
+
+Status ServiceRunner::start() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_.load(std::memory_order_acquire)) {
+        return Status::Error(StatusCode::FailedPrecondition,
+                             "ServiceRunner cannot be restarted after shutdown");
+    }
+    bool expected = false;
+    if (!running_.compare_exchange_strong(expected, true,
+                                         std::memory_order_acq_rel)) {
+        return Status::Error(StatusCode::FailedPrecondition,
+                             "ServiceRunner is already running");
+    }
+    auto result = components_.start_all();
+    if (!result.ok()) {
+        running_.store(false, std::memory_order_release);
+        stopped_.store(true, std::memory_order_release);
+    }
+    return result;
+}
+
+Status ServiceRunner::request_stop() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_.exchange(true, std::memory_order_acq_rel)) return stop_status_;
+    running_.store(false, std::memory_order_release);
+    stop_status_ = components_.shutdown_all(drain_timeout_);
+    return stop_status_;
 }
 
 size_t ComponentRegistry::size() const {
