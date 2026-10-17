@@ -103,8 +103,15 @@ void BoundedWorkerQueue::worker_loop() {
 
 #if defined(LOCALHIVE_HAS_BOOST_ASIO)
 NetContext::NetContext(size_t thread_pool_size)
-    : thread_count_(thread_pool_size > 0 ? thread_pool_size : 1),
-      work_guard_(boost::asio::make_work_guard(io_context_)) {}
+    : thread_count_(thread_pool_size > 0 ? thread_pool_size : 1) {
+    loops_.reserve(thread_count_);
+    for (size_t i = 0; i < thread_count_; ++i) {
+        auto loop = std::make_unique<Loop>();
+        loop->work_guard = std::make_unique<Loop::Guard>(
+            boost::asio::make_work_guard(loop->context));
+        loops_.push_back(std::move(loop));
+    }
+}
 
 NetContext::~NetContext() {
     stop();
@@ -116,8 +123,13 @@ Status NetContext::start() {
     }
     threads_.reserve(thread_count_);
     for (size_t i = 0; i < thread_count_; ++i) {
-        threads_.emplace_back([this]() {
-            io_context_.run();
+        auto& loop = *loops_[i];
+        loop.context.restart();
+        loop.work_guard = std::make_unique<Loop::Guard>(
+            boost::asio::make_work_guard(loop.context));
+        auto* loop_ptr = &loop;
+        threads_.emplace_back([loop_ptr]() {
+            loop_ptr->context.run();
         });
     }
     return Status::Ok();
@@ -127,8 +139,10 @@ void NetContext::stop() {
     if (!running_.exchange(false, std::memory_order_acq_rel)) {
         return;
     }
-    work_guard_.reset();
-    io_context_.stop();
+    for (auto& loop : loops_) {
+        loop->work_guard.reset();
+        loop->context.stop();
+    }
     for (auto& t : threads_) {
         if (t.joinable()) {
             t.join();
@@ -139,6 +153,18 @@ void NetContext::stop() {
 
 bool NetContext::is_running() const noexcept {
     return running_.load(std::memory_order_acquire);
+}
+
+boost::asio::io_context& NetContext::asio_context() noexcept {
+    return loops_.front()->context;
+}
+
+boost::asio::io_context& NetContext::asio_context(size_t index) noexcept {
+    return loops_[index % loops_.size()]->context;
+}
+
+boost::asio::io_context& NetContext::next_asio_context() noexcept {
+    return asio_context(next_loop_.fetch_add(1, std::memory_order_relaxed));
 }
 
 #else

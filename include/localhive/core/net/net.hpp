@@ -13,6 +13,7 @@
 #include <thread>
 #include <atomic>
 #include <vector>
+#include <memory>
 
 #if defined(LOCALHIVE_HAS_BOOST_ASIO)
     #include <boost/asio.hpp>
@@ -65,7 +66,11 @@ public:
     [[nodiscard]] bool is_running() const noexcept;
 
 #if defined(LOCALHIVE_HAS_BOOST_ASIO)
-    boost::asio::io_context& asio_context() noexcept { return io_context_; }
+    // Returns the first context for compatibility with single-loop callers.
+    boost::asio::io_context& asio_context() noexcept;
+    [[nodiscard]] boost::asio::io_context& asio_context(size_t index) noexcept;
+    // Round-robin selection for assigning newly accepted connections.
+    [[nodiscard]] boost::asio::io_context& next_asio_context() noexcept;
 #endif
 
 private:
@@ -74,8 +79,14 @@ private:
     std::vector<std::thread> threads_;
 
 #if defined(LOCALHIVE_HAS_BOOST_ASIO)
-    boost::asio::io_context io_context_;
-    boost::asio::executor_work_guard<boost::asio::io_context::executor_type> work_guard_;
+    struct Loop {
+        using Guard = boost::asio::executor_work_guard<
+            boost::asio::io_context::executor_type>;
+        boost::asio::io_context context;
+        std::unique_ptr<Guard> work_guard;
+    };
+    std::vector<std::unique_ptr<Loop>> loops_;
+    std::atomic_size_t next_loop_{0};
 #endif
 };
 
