@@ -46,9 +46,20 @@ struct ProxyConfig {
 
 struct ConcurrencyConfig {
     uint32_t max_active_connections{1024};
+    uint32_t max_concurrent_uploads{128};
+    size_t max_header_bytes{16 * 1024};
+    uint64_t max_single_put_body_bytes{5ULL * 1024 * 1024 * 1024};
+    std::chrono::milliseconds header_read_timeout_ms{10000};
+    std::chrono::milliseconds body_idle_timeout_ms{30000};
+    size_t per_connection_read_buffer_bytes{64 * 1024};
     size_t max_global_queued_payload_bytes{64 * 1024 * 1024}; // 64 MB
+    uint32_t storage_worker_threads{8};
     size_t storage_queue_max_tasks{1024};
     size_t storage_queue_high_watermark_pct{80};
+    size_t sqlite_write_queue_max_tasks{512};
+    uint32_t max_open_file_descriptors{2048};
+    uint32_t max_active_reader_leases{1024};
+    size_t staging_disk_high_watermark_pct{85};
 };
 
 struct AppConfig {
@@ -62,6 +73,7 @@ struct AppConfig {
 [[nodiscard]] Status validate_server_config(const ServerConfig& config);
 [[nodiscard]] Status validate_storage_config(const StorageConfig& config);
 [[nodiscard]] Status validate_proxy_config(const ProxyConfig& config);
+[[nodiscard]] Status validate_concurrency_config(const ConcurrencyConfig& config);
 [[nodiscard]] Status validate_app_config(const AppConfig& config);
 
 // Command-line and Environment Variable parser

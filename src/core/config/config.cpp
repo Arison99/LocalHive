@@ -76,6 +76,38 @@ Status validate_proxy_config(const ProxyConfig &config) {
   return Status::Ok();
 }
 
+Status validate_concurrency_config(const ConcurrencyConfig &config) {
+  if (config.max_active_connections == 0 ||
+      config.max_concurrent_uploads == 0 ||
+      config.storage_worker_threads == 0 ||
+      config.max_open_file_descriptors == 0 ||
+      config.max_active_reader_leases == 0) {
+    return Status::Error(StatusCode::InvalidArgument,
+                         "Concurrency limits and worker counts must be > 0");
+  }
+  if (config.max_header_bytes == 0 || config.max_single_put_body_bytes == 0 ||
+      config.per_connection_read_buffer_bytes == 0 ||
+      config.max_global_queued_payload_bytes == 0 ||
+      config.storage_queue_max_tasks == 0 ||
+      config.sqlite_write_queue_max_tasks == 0) {
+    return Status::Error(StatusCode::InvalidArgument,
+                         "Resource limits and queue capacities must be > 0");
+  }
+  if (config.header_read_timeout_ms.count() <= 0 ||
+      config.body_idle_timeout_ms.count() <= 0) {
+    return Status::Error(StatusCode::InvalidArgument,
+                         "Request timeouts must be > 0 milliseconds");
+  }
+  if (config.storage_queue_high_watermark_pct == 0 ||
+      config.storage_queue_high_watermark_pct >= 100 ||
+      config.staging_disk_high_watermark_pct == 0 ||
+      config.staging_disk_high_watermark_pct >= 100) {
+    return Status::Error(StatusCode::InvalidArgument,
+                         "High watermarks must be between 1 and 99 percent");
+  }
+  return Status::Ok();
+}
+
 Status validate_app_config(const AppConfig &config) {
   auto s1 = validate_server_config(config.server);
   if (!s1.ok())
@@ -86,6 +118,9 @@ Status validate_app_config(const AppConfig &config) {
   auto s3 = validate_proxy_config(config.proxy);
   if (!s3.ok())
     return s3;
+  auto s4 = validate_concurrency_config(config.concurrency);
+  if (!s4.ok())
+    return s4;
   return Status::Ok();
 }
 
@@ -150,13 +185,14 @@ Result<AppConfig> ConfigParser::parse_args(const std::vector<std::string> &args,
       }
       const auto &val_str = args[++i];
       uint32_t val = 0;
-            auto [ptr, ec] = std::from_chars(val_str.data(), val_str.data() + val_str.size(), valval = 0;
-            auto [p, err] = std::from_chars(val_str.data(), val_str.data() + val_str.size(), val);
-            if (err != std::errc() || val == 0 || val > 65535) {
+      const auto [ptr, err] = std::from_chars(
+          val_str.data(), val_str.data() + val_str.size(), val);
+      if (err != std::errc() || ptr != val_str.data() + val_str.size() ||
+          val == 0 || val > 65535) {
         return Status::Error(StatusCode::InvalidArgument,
                              "Invalid port value: " + val_str);
-            }
-            cfg.server.port = static_cast<uint16_t>(val);
+      }
+      cfg.server.port = static_cast<uint16_t>(val);
     } else if (arg == "--host") {
       if (i + 1 >= args.size()) {
         return Status::Error(StatusCode::InvalidArgument,
