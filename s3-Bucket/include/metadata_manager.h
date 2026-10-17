@@ -13,6 +13,9 @@ public:
     ~MetadataManager();
 
     bool addMetadata(const std::string &key, size_t size, const std::string &creationDate, const std::string &contentType);
+    bool removeMetadata(const std::string &key);
+    bool getMetadata(const std::string &key, size_t &size, std::string &creationDate, std::string &lastModified, std::string &contentType);
+    void listAllMetadata();
 
 private:
     sqlite3 *db;

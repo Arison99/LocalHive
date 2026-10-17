@@ -42,3 +42,57 @@ bool MetadataManager::addMetadata(const std::string &key, size_t size, const std
     sqlite3_finalize(stmt);
     return false;
 }
+
+bool MetadataManager::removeMetadata(const std::string &key) {
+    std::string sql = "DELETE FROM Metadata WHERE Key = ?;";
+    sqlite3_stmt *stmt;
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
+    sqlite3_bind_text(stmt, 1, key.c_str(), -1, SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) == SQLITE_DONE) {
+        sqlite3_finalize(stmt);
+        return true;
+    }
+
+    std::cerr << "Error removing metadata: " << sqlite3_errmsg(db) << std::endl;
+    sqlite3_finalize(stmt);
+    return false;
+}
+
+bool MetadataManager::getMetadata(const std::string &key, size_t &size, std::string &creationDate, std::string &lastModified, std::string &contentType) {
+    std::string sql = "SELECT Size, CreationDate, LastModifiedDate, ContentType FROM Metadata WHERE Key = ?;";
+    sqlite3_stmt *stmt;
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
+    sqlite3_bind_text(stmt, 1, key.c_str(), -1, SQLITE_STATIC);
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        size = sqlite3_column_int64(stmt, 0);
+        creationDate = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+        lastModified = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+        contentType = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+        sqlite3_finalize(stmt);
+        return true;
+    }
+
+    sqlite3_finalize(stmt);
+    return false;
+}
+
+void MetadataManager::listAllMetadata() {
+    std::string sql = "SELECT Key, Size, CreationDate, LastModifiedDate, ContentType FROM Metadata;";
+    sqlite3_stmt *stmt;
+    sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
+
+    std::cout << "\n=== Metadata Listing ===" << std::endl;
+    std::cout << "Key\t\tSize\tCreation Date\t\tContent Type" << std::endl;
+    std::cout << "-------------------------------------------------------" << std::endl;
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        std::cout << sqlite3_column_text(stmt, 0) << "\t";
+        std::cout << sqlite3_column_int64(stmt, 1) << "\t";
+        std::cout << sqlite3_column_text(stmt, 2) << "\t";
+        std::cout << sqlite3_column_text(stmt, 4) << std::endl;
+    }
+
+    sqlite3_finalize(stmt);
+}

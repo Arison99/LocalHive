@@ -4,6 +4,7 @@
 #include "bucket_manager.h"
 #include <filesystem>
 #include <iostream>
+#include <fstream>
 
 namespace fs = std::filesystem;
 
