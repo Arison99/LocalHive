@@ -40,6 +40,21 @@ else()
     message(STATUS "Boost not detected in standard system paths; Core compiled with standalone transport primitives.")
 endif()
 
+# ==============================================================================
+# Target: localhive_storage (immutable generation layout and metadata boundary)
+# ==============================================================================
+add_library(localhive_storage STATIC
+    src/storage/storage_layout.cpp
+    include/localhive/storage/storage_layout.hpp
+)
+
+target_include_directories(localhive_storage PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(localhive_storage PUBLIC localhive_core)
+
 # Optional SQLite discovery
 find_package(SQLite3 QUIET)
 if(SQLite3_FOUND)
@@ -70,6 +85,7 @@ set(CORE_HEADERS
     include/localhive/core/metrics/metrics.hpp
     include/localhive/core/crypto/crypto.hpp
     include/localhive/core/net/net.hpp
+    include/localhive/core/concurrency/bounded_thread_pool.hpp
 )
 
 add_library(localhive_core STATIC
