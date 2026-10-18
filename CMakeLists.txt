@@ -40,21 +40,6 @@ else()
     message(STATUS "Boost not detected in standard system paths; Core compiled with standalone transport primitives.")
 endif()
 
-# ==============================================================================
-# Target: localhive_storage (immutable generation layout and metadata boundary)
-# ==============================================================================
-add_library(localhive_storage STATIC
-    src/storage/storage_layout.cpp
-    include/localhive/storage/storage_layout.hpp
-)
-
-target_include_directories(localhive_storage PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-
-target_link_libraries(localhive_storage PUBLIC localhive_core)
-
 # Optional SQLite discovery
 find_package(SQLite3 QUIET)
 if(SQLite3_FOUND)
@@ -107,6 +92,47 @@ if(Boost_FOUND)
     target_compile_definitions(localhive_core PUBLIC LOCALHIVE_HAS_BOOST_ASIO=1)
     target_link_libraries(localhive_core PUBLIC Boost::system)
 endif()
+
+# ==============================================================================
+# Target: localhive_storage (immutable generation layout and metadata boundary)
+# ==============================================================================
+add_library(localhive_storage STATIC
+    src/storage/storage_layout.cpp
+    src/storage/metadata_store.cpp
+    src/storage/object_store.cpp
+    src/storage/recovery.cpp
+    src/storage/reader_leases.cpp
+    src/storage/garbage_collector.cpp
+    include/localhive/storage/storage_layout.hpp
+    include/localhive/storage/metadata_store.hpp
+    include/localhive/storage/object_store.hpp
+    include/localhive/storage/recovery.hpp
+    include/localhive/storage/reader_leases.hpp
+    include/localhive/storage/garbage_collector.hpp
+)
+
+target_include_directories(localhive_storage PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(localhive_storage PUBLIC localhive_core)
+if(SQLite3_FOUND)
+    target_compile_definitions(localhive_storage PRIVATE LOCALHIVE_HAS_SQLITE3=1)
+    target_link_libraries(localhive_storage PRIVATE SQLite::SQLite3)
+endif()
+
+# ==============================================================================
+# Target: localhive_s3_core (S3 routing, authentication, and XML)
+# ==============================================================================
+add_library(localhive_s3_core STATIC
+    src/s3/router.cpp
+    include/localhive/s3/router.hpp
+)
+target_include_directories(localhive_s3_core PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(localhive_s3_core PUBLIC localhive_core)
 
 # ==============================================================================
 # Unit Tests & CTest Integration
