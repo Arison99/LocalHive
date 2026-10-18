@@ -21,6 +21,20 @@ const char* state_name(GenerationState state) {
     return "aborted";
 }
 
+core::Result<GenerationState> parse_state(const char* state) {
+    if (state == nullptr) return core::Status::Error(core::StatusCode::DataLoss, "Generation state is null");
+    const std::string value(state);
+    if (value == "receiving") return GenerationState::Receiving;
+    if (value == "staged") return GenerationState::Staged;
+    if (value == "prepared") return GenerationState::Prepared;
+    if (value == "published") return GenerationState::Published;
+    if (value == "committed") return GenerationState::Committed;
+    if (value == "obsolete") return GenerationState::Obsolete;
+    if (value == "tombstone") return GenerationState::Tombstone;
+    if (value == "aborted") return GenerationState::Aborted;
+    return core::Status::Error(core::StatusCode::DataLoss, "Unknown generation state", value);
+}
+
 #if defined(LOCALHIVE_HAS_SQLITE3)
 core::Status sqlite_status(sqlite3* db, int result, const char* action) {
     if (result == SQLITE_OK || result == SQLITE_DONE || result == SQLITE_ROW) {
@@ -177,6 +191,44 @@ core::Status SqliteMetadataStore::create_generation(const GenerationRecord& gene
 #endif
 }
 
+core::Status SqliteMetadataStore::set_generation_state(GenerationId generation_id,
+                                                        GenerationState state) {
+    std::lock_guard<std::mutex> lock(mutex_); auto status = ensure_open_locked(); if (!status.ok()) return status;
+#if defined(LOCALHIVE_HAS_SQLITE3)
+    auto* db = static_cast<sqlite3*>(database_);
+    Statement statement(db, "UPDATE generations SET state=?1 WHERE gen_id=?2;");
+    if (statement.result() != SQLITE_OK) return sqlite_status(db, statement.result(), "Could not prepare generation state update");
+    sqlite3_bind_text(statement.get(), 1, state_name(state), -1, SQLITE_STATIC);
+    sqlite3_bind_int64(statement.get(), 2, static_cast<sqlite3_int64>(generation_id));
+    status = sqlite_status(db, sqlite3_step(statement.get()), "Could not update generation state");
+    if (!status.ok()) return status;
+    if (sqlite3_changes(db) != 1) return core::Status::Error(core::StatusCode::NotFound, "Generation does not exist");
+    return core::Status::Ok();
+#else
+    return status;
+#endif
+}
+
+core::Status SqliteMetadataStore::stage_generation(GenerationId generation_id,
+                                                    uint64_t content_length,
+                                                    std::string_view checksum_sha256) {
+    std::lock_guard<std::mutex> lock(mutex_); auto status = ensure_open_locked(); if (!status.ok()) return status;
+#if defined(LOCALHIVE_HAS_SQLITE3)
+    auto* db = static_cast<sqlite3*>(database_);
+    Statement statement(db, "UPDATE generations SET state='staged',content_length=?1,checksum_sha256=?2 WHERE gen_id=?3 AND state='receiving';");
+    if (statement.result() != SQLITE_OK) return sqlite_status(db, statement.result(), "Could not prepare generation staging update");
+    sqlite3_bind_int64(statement.get(), 1, static_cast<sqlite3_int64>(content_length));
+    sqlite3_bind_text(statement.get(), 2, checksum_sha256.data(), static_cast<int>(checksum_sha256.size()), SQLITE_TRANSIENT);
+    sqlite3_bind_int64(statement.get(), 3, static_cast<sqlite3_int64>(generation_id));
+    status = sqlite_status(db, sqlite3_step(statement.get()), "Could not stage generation");
+    if (!status.ok()) return status;
+    if (sqlite3_changes(db) != 1) return core::Status::Error(core::StatusCode::FailedPrecondition, "Generation is not receiving");
+    return core::Status::Ok();
+#else
+    return status;
+#endif
+}
+
 core::Status SqliteMetadataStore::publish_generation(GenerationId generation_id) {
     std::lock_guard<std::mutex> lock(mutex_); auto status = ensure_open_locked(); if (!status.ok()) return status;
 #if defined(LOCALHIVE_HAS_SQLITE3)
@@ -208,6 +260,67 @@ core::Result<GenerationRecord> SqliteMetadataStore::active_generation(BucketId b
     const int result = sqlite3_step(statement.get()); if (result == SQLITE_DONE) return core::Status::Error(core::StatusCode::NotFound, "Object has no active generation");
     status = sqlite_status(db, result, "Could not query active generation"); if (!status.ok()) return status;
     return GenerationRecord{{bucket_id, static_cast<ObjectId>(sqlite3_column_int64(statement.get(), 0)), static_cast<GenerationId>(sqlite3_column_int64(statement.get(), 1))}, GenerationState::Published, static_cast<uint64_t>(sqlite3_column_int64(statement.get(), 3)), reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 4))};
+#else
+    return status;
+#endif
+}
+
+core::Result<std::vector<RecoveryCandidate>> SqliteMetadataStore::recovery_candidates() {
+    std::lock_guard<std::mutex> lock(mutex_); auto status = ensure_open_locked(); if (!status.ok()) return status;
+#if defined(LOCALHIVE_HAS_SQLITE3)
+    auto* db = static_cast<sqlite3*>(database_);
+    Statement statement(db, "SELECT o.bucket_id,g.object_id,g.gen_id,g.state FROM generations g JOIN objects o ON o.id=g.object_id WHERE g.state IN ('receiving','staged','prepared','published');");
+    if (statement.result() != SQLITE_OK) return sqlite_status(db, statement.result(), "Could not prepare recovery query");
+    std::vector<RecoveryCandidate> candidates;
+    while (true) {
+        const int result = sqlite3_step(statement.get());
+        if (result == SQLITE_DONE) break;
+        status = sqlite_status(db, result, "Could not read recovery candidates"); if (!status.ok()) return status;
+        auto state = parse_state(reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 3)));
+        if (!state.ok()) return state.status();
+        candidates.push_back({{static_cast<BucketId>(sqlite3_column_int64(statement.get(), 0)),
+                               static_cast<ObjectId>(sqlite3_column_int64(statement.get(), 1)),
+                               static_cast<GenerationId>(sqlite3_column_int64(statement.get(), 2))}, state.value()});
+    }
+    return candidates;
+#else
+    return status;
+#endif
+}
+
+core::Result<std::vector<RecoveryCandidate>> SqliteMetadataStore::reclaimable_generations() {
+    std::lock_guard<std::mutex> lock(mutex_); auto status = ensure_open_locked(); if (!status.ok()) return status;
+#if defined(LOCALHIVE_HAS_SQLITE3)
+    auto* db = static_cast<sqlite3*>(database_);
+    Statement statement(db, "SELECT o.bucket_id,g.object_id,g.gen_id,g.state FROM generations g JOIN objects o ON o.id=g.object_id WHERE g.state IN ('obsolete','tombstone');");
+    if (statement.result() != SQLITE_OK) return sqlite_status(db, statement.result(), "Could not prepare garbage collection query");
+    std::vector<RecoveryCandidate> candidates;
+    while (true) {
+        const int result = sqlite3_step(statement.get());
+        if (result == SQLITE_DONE) break;
+        status = sqlite_status(db, result, "Could not read reclaimable generations"); if (!status.ok()) return status;
+        auto state = parse_state(reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 3)));
+        if (!state.ok()) return state.status();
+        candidates.push_back({{static_cast<BucketId>(sqlite3_column_int64(statement.get(), 0)),
+                               static_cast<ObjectId>(sqlite3_column_int64(statement.get(), 1)),
+                               static_cast<GenerationId>(sqlite3_column_int64(statement.get(), 2))}, state.value()});
+    }
+    return candidates;
+#else
+    return status;
+#endif
+}
+
+core::Status SqliteMetadataStore::remove_generation(GenerationId generation_id) {
+    std::lock_guard<std::mutex> lock(mutex_); auto status = ensure_open_locked(); if (!status.ok()) return status;
+#if defined(LOCALHIVE_HAS_SQLITE3)
+    auto* db = static_cast<sqlite3*>(database_);
+    Statement statement(db, "DELETE FROM generations WHERE gen_id=?1 AND gen_id NOT IN (SELECT active_gen_id FROM objects WHERE active_gen_id IS NOT NULL);");
+    if (statement.result() != SQLITE_OK) return sqlite_status(db, statement.result(), "Could not prepare generation deletion");
+    sqlite3_bind_int64(statement.get(), 1, static_cast<sqlite3_int64>(generation_id));
+    status = sqlite_status(db, sqlite3_step(statement.get()), "Could not delete generation"); if (!status.ok()) return status;
+    if (sqlite3_changes(db) != 1) return core::Status::Error(core::StatusCode::FailedPrecondition, "Generation is active or does not exist");
+    return core::Status::Ok();
 #else
     return status;
 #endif

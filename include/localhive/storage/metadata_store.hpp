@@ -7,6 +7,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace localhive::storage {
 
@@ -29,6 +30,11 @@ struct GenerationRecord {
     std::string checksum_sha256;
 };
 
+struct RecoveryCandidate {
+    ObjectIdentity identity;
+    GenerationState state{GenerationState::Receiving};
+};
+
 class IMetadataStore {
 public:
     virtual ~IMetadataStore() = default;
@@ -38,11 +44,19 @@ public:
     virtual core::Result<ObjectRecord> find_or_create_object(
         BucketId bucket_id, std::string_view key) = 0;
     virtual core::Status create_generation(const GenerationRecord& generation) = 0;
+    virtual core::Status set_generation_state(GenerationId generation_id,
+                                              GenerationState state) = 0;
+    virtual core::Status stage_generation(GenerationId generation_id,
+                                          uint64_t content_length,
+                                          std::string_view checksum_sha256) = 0;
     // Makes generation visible and retires the previous active generation in
     // one SQLite transaction. The generation file must already exist on disk.
     virtual core::Status publish_generation(GenerationId generation_id) = 0;
     virtual core::Result<GenerationRecord> active_generation(
         BucketId bucket_id, std::string_view key) = 0;
+    virtual core::Result<std::vector<RecoveryCandidate>> recovery_candidates() = 0;
+    virtual core::Result<std::vector<RecoveryCandidate>> reclaimable_generations() = 0;
+    virtual core::Status remove_generation(GenerationId generation_id) = 0;
 };
 
 class SqliteMetadataStore final : public IMetadataStore {
@@ -60,9 +74,17 @@ public:
     core::Result<ObjectRecord> find_or_create_object(
         BucketId bucket_id, std::string_view key) override;
     core::Status create_generation(const GenerationRecord& generation) override;
+    core::Status set_generation_state(GenerationId generation_id,
+                                      GenerationState state) override;
+    core::Status stage_generation(GenerationId generation_id,
+                                  uint64_t content_length,
+                                  std::string_view checksum_sha256) override;
     core::Status publish_generation(GenerationId generation_id) override;
     core::Result<GenerationRecord> active_generation(
         BucketId bucket_id, std::string_view key) override;
+    core::Result<std::vector<RecoveryCandidate>> recovery_candidates() override;
+    core::Result<std::vector<RecoveryCandidate>> reclaimable_generations() override;
+    core::Status remove_generation(GenerationId generation_id) override;
 
 private:
     core::Status ensure_open_locked();
