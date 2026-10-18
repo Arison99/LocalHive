@@ -265,6 +265,86 @@ core::Result<GenerationRecord> SqliteMetadataStore::active_generation(BucketId b
 #endif
 }
 
+core::Status SqliteMetadataStore::delete_active_object(BucketId bucket_id,
+                                                        std::string_view key) {
+    auto normalized = normalize_object_key(key);
+    if (!normalized.ok()) return normalized.status();
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto status = ensure_open_locked();
+    if (!status.ok()) return status;
+#if defined(LOCALHIVE_HAS_SQLITE3)
+    auto* db = static_cast<sqlite3*>(database_);
+    status = execute(db, "BEGIN IMMEDIATE;");
+    if (!status.ok()) return status;
+
+    sqlite3_int64 generation_id = 0;
+    {
+        Statement lookup(db, "SELECT active_gen_id FROM objects WHERE bucket_id=?1 AND key=?2;");
+        if (lookup.result() != SQLITE_OK) {
+            execute(db, "ROLLBACK;");
+            return sqlite_status(db, lookup.result(), "Could not prepare object deletion lookup");
+        }
+        sqlite3_bind_int64(lookup.get(), 1, static_cast<sqlite3_int64>(bucket_id));
+        sqlite3_bind_text(lookup.get(), 2, normalized.value().c_str(), -1, SQLITE_TRANSIENT);
+        const int result = sqlite3_step(lookup.get());
+        if (result == SQLITE_DONE) {
+            execute(db, "ROLLBACK;");
+            return core::Status::Error(core::StatusCode::NotFound,
+                                       "Object has no active generation");
+        }
+        status = sqlite_status(db, result, "Could not find active object for deletion");
+        if (!status.ok()) {
+            execute(db, "ROLLBACK;");
+            return status;
+        }
+        if (sqlite3_column_type(lookup.get(), 0) == SQLITE_NULL) {
+            execute(db, "ROLLBACK;");
+            return core::Status::Error(core::StatusCode::NotFound,
+                                       "Object has no active generation");
+        }
+        generation_id = sqlite3_column_int64(lookup.get(), 0);
+    }
+
+    Statement tombstone(db,
+        "UPDATE generations SET state='tombstone' WHERE gen_id=?1 "
+        "AND state IN ('published','committed');");
+    if (tombstone.result() != SQLITE_OK) {
+        execute(db, "ROLLBACK;");
+        return sqlite_status(db, tombstone.result(), "Could not prepare object tombstone");
+    }
+    sqlite3_bind_int64(tombstone.get(), 1, generation_id);
+    status = sqlite_status(db, sqlite3_step(tombstone.get()), "Could not tombstone object generation");
+    if (!status.ok() || sqlite3_changes(db) != 1) {
+        execute(db, "ROLLBACK;");
+        return status.ok()
+            ? core::Status::Error(core::StatusCode::FailedPrecondition,
+                                  "Active generation cannot be tombstoned")
+            : status;
+    }
+
+    Statement deactivate(db,
+        "UPDATE objects SET active_gen_id=NULL WHERE bucket_id=?1 AND key=?2 AND active_gen_id=?3;");
+    if (deactivate.result() != SQLITE_OK) {
+        execute(db, "ROLLBACK;");
+        return sqlite_status(db, deactivate.result(), "Could not prepare active object removal");
+    }
+    sqlite3_bind_int64(deactivate.get(), 1, static_cast<sqlite3_int64>(bucket_id));
+    sqlite3_bind_text(deactivate.get(), 2, normalized.value().c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(deactivate.get(), 3, generation_id);
+    status = sqlite_status(db, sqlite3_step(deactivate.get()), "Could not remove active object pointer");
+    if (!status.ok() || sqlite3_changes(db) != 1) {
+        execute(db, "ROLLBACK;");
+        return status.ok()
+            ? core::Status::Error(core::StatusCode::Aborted,
+                                  "Active object changed during deletion")
+            : status;
+    }
+    return execute(db, "COMMIT;");
+#else
+    return status;
+#endif
+}
+
 core::Result<std::vector<RecoveryCandidate>> SqliteMetadataStore::recovery_candidates() {
     std::lock_guard<std::mutex> lock(mutex_); auto status = ensure_open_locked(); if (!status.ok()) return status;
 #if defined(LOCALHIVE_HAS_SQLITE3)

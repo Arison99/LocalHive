@@ -54,6 +54,10 @@ public:
     virtual core::Status publish_generation(GenerationId generation_id) = 0;
     virtual core::Result<GenerationRecord> active_generation(
         BucketId bucket_id, std::string_view key) = 0;
+    // Removes an object's active pointer and marks its generation reclaimable
+    // in one metadata transaction. Returns NotFound if no active object exists.
+    virtual core::Status delete_active_object(BucketId bucket_id,
+                                              std::string_view key) = 0;
     virtual core::Result<std::vector<RecoveryCandidate>> recovery_candidates() = 0;
     virtual core::Result<std::vector<RecoveryCandidate>> reclaimable_generations() = 0;
     virtual core::Status remove_generation(GenerationId generation_id) = 0;
@@ -82,6 +86,8 @@ public:
     core::Status publish_generation(GenerationId generation_id) override;
     core::Result<GenerationRecord> active_generation(
         BucketId bucket_id, std::string_view key) override;
+    core::Status delete_active_object(BucketId bucket_id,
+                                      std::string_view key) override;
     core::Result<std::vector<RecoveryCandidate>> recovery_candidates() override;
     core::Result<std::vector<RecoveryCandidate>> reclaimable_generations() override;
     core::Status remove_generation(GenerationId generation_id) override;
