@@ -60,11 +60,17 @@ public:
         ObjectReadSession() = default;
         [[nodiscard]] core::Result<size_t> read(uint8_t* destination, size_t capacity);
         [[nodiscard]] const ObjectIdentity& identity() const noexcept { return identity_; }
+        [[nodiscard]] uint64_t content_length() const noexcept { return content_length_; }
+        [[nodiscard]] const std::string& checksum_sha256() const noexcept { return checksum_sha256_; }
     private:
         friend class ObjectStore;
-        ObjectReadSession(ObjectIdentity identity, ReaderLease lease, std::ifstream stream)
-            : identity_(identity), lease_(std::move(lease)), stream_(std::move(stream)) {}
+        ObjectReadSession(const GenerationRecord& generation, ReaderLease lease, std::ifstream stream)
+            : identity_(generation.identity), content_length_(generation.content_length),
+              checksum_sha256_(generation.checksum_sha256), lease_(std::move(lease)),
+              stream_(std::move(stream)) {}
         ObjectIdentity identity_{};
+        uint64_t content_length_{0};
+        std::string checksum_sha256_;
         ReaderLease lease_;
         std::ifstream stream_;
     };
@@ -72,6 +78,10 @@ public:
     // Garbage collection therefore cannot remove data being streamed.
     [[nodiscard]] core::Result<ObjectReadSession> open_reader(
         BucketId bucket_id, std::string_view key);
+    // Hides the active generation immediately; existing leased readers retain
+    // access until their sessions close and garbage collection runs.
+    [[nodiscard]] core::Status delete_object(BucketId bucket_id,
+                                             std::string_view key);
     [[nodiscard]] ReaderLeaseManager& reader_leases() noexcept { return *reader_leases_; }
 
 private:

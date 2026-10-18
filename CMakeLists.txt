@@ -126,13 +126,45 @@ endif()
 # ==============================================================================
 add_library(localhive_s3_core STATIC
     src/s3/router.cpp
+    src/s3/sigv4.cpp
+    src/s3/xml.cpp
+    src/s3/request_dispatch.cpp
     include/localhive/s3/router.hpp
+    include/localhive/s3/sigv4.hpp
+    include/localhive/s3/xml.hpp
+    include/localhive/s3/request_dispatch.hpp
 )
 target_include_directories(localhive_s3_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(localhive_s3_core PUBLIC localhive_core)
+
+# ============================================================================
+# Target: localhive_s3_service (protocol-to-storage coordination)
+# ============================================================================
+add_library(localhive_s3_service STATIC
+    src/s3/service.cpp
+    include/localhive/s3/service.hpp
+)
+target_include_directories(localhive_s3_service PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(localhive_s3_service PUBLIC localhive_s3_core localhive_storage)
+
+# ============================================================================
+# Target: localhive_s3_http (parsed HTTP request adapter)
+# ============================================================================
+add_library(localhive_s3_http STATIC
+    src/s3/http_handler.cpp
+    include/localhive/s3/http_handler.hpp
+)
+target_include_directories(localhive_s3_http PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(localhive_s3_http PUBLIC localhive_s3_service)
 
 # ==============================================================================
 # Unit Tests & CTest Integration
@@ -156,6 +188,14 @@ if(BUILD_TESTING)
     add_core_test(test_core_metrics   tests/core/test_metrics.cpp)
     add_core_test(test_core_crypto    tests/core/test_crypto.cpp)
     add_core_test(test_core_net       tests/core/test_net.cpp)
+
+    add_executable(test_s3_request_dispatch tests/s3/test_request_dispatch.cpp)
+    target_link_libraries(test_s3_request_dispatch PRIVATE localhive_s3_core)
+    add_test(NAME test_s3_request_dispatch COMMAND test_s3_request_dispatch)
+
+    add_executable(test_s3_service tests/s3/test_service.cpp)
+    target_link_libraries(test_s3_service PRIVATE localhive_s3_http)
+    add_test(NAME test_s3_service COMMAND test_s3_service)
 endif()
 
 # ==============================================================================

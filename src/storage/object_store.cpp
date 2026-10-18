@@ -169,7 +169,15 @@ core::Result<ObjectStore::ObjectReadSession> ObjectStore::open_reader(
     std::ifstream stream(path, std::ios::binary);
     if (!stream) return core::Status::Error(core::StatusCode::NotFound,
         "Active generation data file does not exist", path.string());
-    return ObjectReadSession(generation.value().identity, std::move(lease), std::move(stream));
+    return ObjectReadSession(generation.value(), std::move(lease), std::move(stream));
+}
+
+core::Status ObjectStore::delete_object(BucketId bucket_id, std::string_view key) {
+    if (!metadata_) {
+        return core::Status::Error(core::StatusCode::FailedPrecondition,
+                                   "Object store is not configured");
+    }
+    return metadata_->delete_active_object(bucket_id, key);
 }
 
 } // namespace localhive::storage
